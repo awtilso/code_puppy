@@ -777,6 +777,10 @@ async def _run_with_mcp_impl(
         # Selection must never block a run.
         pass
 
+    # Expose this invocation's requested contract to lifecycle hooks, even
+    # when a previously built wrapper is reused unchanged.
+    effective_output_type = output_type if output_type is not None else str
+
     if agent._code_generation_agent is None:
         build_pydantic_agent(agent)
     pydantic_agent = agent._code_generation_agent
@@ -921,7 +925,7 @@ async def _run_with_mcp_impl(
         # concurrent runs). Owning the scope here — rather than wrapping the
         # create_task call — keeps it correct regardless of how this coroutine
         # is scheduled.
-        with executing_agent_context(agent):
+        with executing_agent_context(agent, output_type=effective_output_type):
             return await _run_agent_task_body()
 
     async def _run_agent_task_body() -> Any:
@@ -1026,7 +1030,7 @@ async def _run_with_mcp_impl(
     # refresh, credential minting) finish before any HTTP leaves — else the
     # task races ahead with stale credentials (issue #338).
     try:
-        with executing_agent_context(agent):
+        with executing_agent_context(agent, output_type=effective_output_type):
             await on_agent_run_start(
                 agent_name=agent.name,
                 model_name=agent.get_model_name(),
@@ -1207,7 +1211,7 @@ async def _run_with_mcp_impl(
             except Exception:
                 pass
         try:
-            with executing_agent_context(agent):
+            with executing_agent_context(agent, output_type=effective_output_type):
                 await on_agent_run_end(
                     agent_name=agent.name,
                     model_name=agent.get_model_name(),
